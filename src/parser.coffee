@@ -1,6 +1,7 @@
 {EventEmitter} = require 'events'
 Header = require './header'
 fs = require 'fs'
+iconv = require 'iconv-lite'
 
 class Parser extends EventEmitter
 
@@ -16,20 +17,20 @@ class Parser extends EventEmitter
             @emit 'header', @header
 
             sequenceNumber = 0
-            
+
             loc = @header.start
             bufLoc = @header.start
             overflow = null
             @paused = false
-            
+
             stream = fs.createReadStream @filename
-            
+
             @readBuf = =>
-            
+
                 if @paused
                     @emit 'paused'
                     return
-                
+
                 while buffer = stream.read()
                     if bufLoc isnt @header.start then bufLoc = 0
                     if overflow isnt null then buffer = overflow + buffer
@@ -41,19 +42,19 @@ class Parser extends EventEmitter
                     if bufLoc < buffer.length then overflow = buffer.slice bufLoc, buffer.length else overflow = null
 
                     return @
-                    
-            stream.on 'readable',@readBuf            
+
+            stream.on 'readable',@readBuf
             stream.on 'end', () =>
                 @emit 'end'
 
         return @
-        
-    pause: =>        
+
+    pause: =>
         @paused = true
-        
-    resume: =>    
-        @paused = false        
-        @emit 'resuming'        
+
+    resume: =>
+        @paused = false
+        @emit 'resuming'
         do @readBuf
 
     parseRecord: (sequenceNumber, buffer) =>
@@ -70,7 +71,10 @@ class Parser extends EventEmitter
         return record
 
     parseField: (field, buffer) =>
-        value = (buffer.toString @encoding).trim()
+        if @encoding isnt 'utf-8'
+            value = (iconv.decode buffer, @encoding).trim()
+        else
+            value = (buffer.toString @encoding).trim()
 
         if field.type is 'N'
             value = parseInt value, 10
